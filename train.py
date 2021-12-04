@@ -166,8 +166,8 @@ def CosineLoss(input, target):
     return ret
 
 
-#####RCLoss#########################
-def RCLoss(map_PEDCC, label, feature):
+#####SCLoss#########################
+def SCLoss(map_PEDCC, label, feature):
     average_feature = map_PEDCC[label.long().data].float().cuda()
     feature = feature - average_feature
     covariance100 = 1 / (feature.shape[0] - 1) * torch.mm(feature.T, feature).float()
@@ -214,7 +214,7 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
                 label_mse_tensor = label_mse_tensor.cuda()
             output, output2 = net(im)
             loss1 = CosineLoss(output2, label_mse_tensor)
-            loss2 = RCLoss(map_PEDCC, label, output2)
+            loss2 = SCLoss(map_PEDCC, label, output2)
             loss = loss1 + loss2
             length += output.pow(2).sum().item()
             num += output.shape[0]
@@ -239,7 +239,7 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
                 output, output2 = net(im)
                 # loss = criterion2(output, label)
                 loss1 = CosineLoss(output2, label_mse_tensor)
-                loss2 = RCLoss(map_PEDCC, label, output2)
+                loss2 = SCLoss(map_PEDCC, label, output2)
                 loss = loss1 + loss2
                 valid_loss += loss.data
                 valid_acc += get_acc(output, label)
