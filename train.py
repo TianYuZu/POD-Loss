@@ -155,28 +155,42 @@ def draw(history):
     plt.savefig('./Training and validation acc.jpg')
     plt.show()
 
-#####CosineLoss##################
-def CosineLoss(input, target):
-    ret = input * target
-    ret_sum = torch.sum(ret, dim=1)
-    ret = 1 - ret_sum
-    ret = ret ** 2
-    ret = torch.mean(ret)
+    
+def l2_norm(input, axis=1):
+    norm = torch.norm(input, 2, axis, True)
+    output = torch.div(input, norm)
+    return output
 
+
+#####NaCLoss##################
+def NaCLoss(input, target, delta):
+    ret_before = input * target
+    ret_before = torch.sum(ret_before, dim=1).view(-1, 1)
+
+    add_feature = delta * torch.ones((input.shape[0], 1)).cuda()
+    input_after = torch.cat((input, add_feature), dim=1)
+    input_after_norm = torch.norm(input_after, p=2, dim=1, keepdim=True)
+
+    ret = ret_before / input_after_norm
+    ret = 1 - ret
+    ret = ret.pow(2)
+    ret = torch.mean(ret)
+    
     return ret
 
 
 #####SCLoss#########################
 def SCLoss(map_PEDCC, label, feature):
     average_feature = map_PEDCC[label.long().data].float().cuda()
-    feature = feature - average_feature
-    covariance100 = 1 / (feature.shape[0] - 1) * torch.mm(feature.T, feature).float()
+    feature_norm = l2_norm(feature)
+    feature_norm = feature_norm - average_feature
+    covariance100 = 1 / (feature_norm.shape[0] - 1) * torch.mm(feature_norm.T, feature_norm).float()
     covariance100_loss = torch.sum(pow(covariance100, 2)) - torch.sum(pow(torch.diagonal(covariance100), 2))
     covariance100_loss = covariance100_loss / (covariance100.shape[0] - 1)
-    return covariance100_loss, covariance100
+    return covariance100_loss
 
 
-def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
+def train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
     LR = cfg['LR']
     if torch.cuda.is_available():
         net = torch.nn.DataParallel(net, device_ids=device_ids)
@@ -195,6 +209,7 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
         map_PEDCC = torch.cat((map_PEDCC, map_dict[i].float()), 0)
     map_PEDCC = map_PEDCC.view(classes_num, -1)  # (class_num, dimension)
 
+    delta = 0.05
     for epoch in range(cfg['max_epoch']):
         if epoch in cfg['lr_steps']:
             if epoch != 0:
@@ -205,6 +220,8 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
         length, num = 0, 0
         length_test = 0
         net = net.train()
+        
+        l2_norm_trainSample = torch.Tensor([]).cuda()
         for im, label in tqdm(train_data):
             if torch.cuda.is_available():
                 im = im.cuda()  # (bs, 3, h, w)
@@ -213,7 +230,9 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
                 label_mse_tensor = tensor_empty1.view(label.shape[0], -1)  # (batchSize, dimension)
                 label_mse_tensor = label_mse_tensor.cuda()
             output, output2 = net(im)
-            loss1 = CosineLoss(output2, label_mse_tensor)
+            with torch.no_grad():
+                l2_norm_trainSample = torch.cat((l2_norm_trainSample, torch.norm(output, p=2, dim=1), dim=0)
+            loss1 = NaCLoss(output2, label_mse_tensor, delta)
             loss2 = SCLoss(map_PEDCC, label, output2)
             loss = loss1 + loss2
             length += output.pow(2).sum().item()
@@ -224,6 +243,7 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
 
             train_loss += loss.data
             train_acc += get_acc(output, label)
+        delta = torch.mean(l2_norm_trainSample).data                                   
         cur_time = datetime.now()
         h, remainder = divmod((cur_time - prev_time).seconds, 3600)
         m, s = divmod(remainder, 60)
@@ -236,11 +256,8 @@ def  train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
                 if torch.cuda.is_available():
                     im = im.cuda()
                     label = label.cuda()
-                output, output2 = net(im)
-                # loss = criterion2(output, label)
-                loss1 = CosineLoss(output2, label_mse_tensor)
-                loss2 = SCLoss(map_PEDCC, label, output2)
-                loss = loss1 + loss2
+                output = net(im)[0]
+                loss = criterion2(output, label)
                 valid_loss += loss.data
                 valid_acc += get_acc(output, label)
                 length_test += output.pow(2).sum().item()/im.shape[0]
