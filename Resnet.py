@@ -103,7 +103,6 @@ class ResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512*block.expansion, feature_size)
         self.out = CosineLinear_PEDCC(feature_size, num_classes)
-        self.fc1 = nn.Linear(512*block.expansion, num_classes)
 
     def l2_norm(self, input):          # According to amsoftmax, we have to normalize the feature, which is x here
         x_norm = torch.norm(input, p=2, dim=1, keepdim=True).clamp(min=1e-12)
@@ -135,9 +134,8 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
-        x_norm = self.l2_norm(x)
-        out = self.out(x_norm)
-        return out, x_norm
+        out = self.out(x)
+        return out, x
 
 
 def resnet18():
