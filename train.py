@@ -210,6 +210,7 @@ def train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
     map_PEDCC = map_PEDCC.view(classes_num, -1)  # (class_num, dimension)
 
     delta = 0.05
+    alpha = 0.01
     for epoch in range(cfg['max_epoch']):
         if epoch in cfg['lr_steps']:
             if epoch != 0:
@@ -243,7 +244,7 @@ def train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
 
             train_loss += loss.data
             train_acc += get_acc(output, label)
-        delta = torch.mean(l2_norm_trainSample).data                                   
+        delta = alpha * (epoch+1) * torch.mean(l2_norm_trainSample).data                                   
         cur_time = datetime.now()
         h, remainder = divmod((cur_time - prev_time).seconds, 3600)
         m, s = divmod(remainder, 60)
