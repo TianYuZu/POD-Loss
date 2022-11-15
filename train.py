@@ -215,7 +215,7 @@ def train_start(net, train_data, valid_data, cfg, save_folder, classes_num):
         if epoch in cfg['lr_steps']:
             if epoch != 0:
                 LR *= 0.1
-            optimizer = optim.SGD(net.parameters(), lr=LR, momentum=0.9, weight_decay=1e-4)
+            optimizer = optim.SGD(net.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
         train_loss = 0
         train_acc = 0
         length, num = 0, 0
