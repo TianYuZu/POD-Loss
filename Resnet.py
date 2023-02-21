@@ -1,20 +1,20 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import CosineLinear_PEDCC
+from train import read_pkl
 
 
 # consieLinear层 实现了norm的fea与norm weight的点积计算，服务于margin based softmax loss
 # 将w替换成pedcc，固定
 # 计算余弦距离
 class CosineLinear_PEDCC(nn.Module):
-    def __init__(self, in_features, out_features):
+    def __init__(self, in_features, out_features, pedcc_type):
         super(CosineLinear_PEDCC, self).__init__()
 
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(in_features, out_features), requires_grad=False)
-        map_dict = read_pkl()
+        map_dict = read_pkl(pedcc_type)
         tensor_empty = torch.Tensor([]).cuda()
         for label_index in range(self.out_features):
             tensor_empty = torch.cat((tensor_empty, map_dict[label_index].float().cuda()), 0)
@@ -86,7 +86,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, nblocks, num_classes=100, feature_size=256):
+    def __init__(self, block, nblocks, num_classes=100, feature_size=256, pedcc_type='center_pedcc/10_256_s.pkl'):
         super(ResNet, self).__init__()
         self.in_planes = 64
         self.pre_layers = nn.Sequential(
@@ -102,7 +102,7 @@ class ResNet(nn.Module):
         # self.avgpool = nn.AvgPool2d(4)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512*block.expansion, feature_size)
-        self.out = CosineLinear_PEDCC(feature_size, num_classes)
+        self.out = CosineLinear_PEDCC(feature_size, num_classes, pedcc_type)
 
     def l2_norm(self, input):          # According to amsoftmax, we have to normalize the feature, which is x here
         x_norm = torch.norm(input, p=2, dim=1, keepdim=True).clamp(min=1e-12)
