@@ -315,7 +315,7 @@ def train():
         print("dataset doesn't exist!")
         exit(0)
 
-    cnn1 = ResNet(Bottleneck, [3, 4, 6, 3], num_classes=cfg['num_classes'], feature_size=cfg['feature_size'])
+    cnn1 = ResNet(Bottleneck, [3, 4, 6, 3], num_classes=cfg['num_classes'], feature_size=cfg['feature_size'], pedcc_type=cfg['PEDCC_Type'])
     train_loader = Data.DataLoader(dataset=train_data, batch_size=cfg['batch_size'], shuffle=True, num_workers=6, pin_memory=True)
     test_loader = Data.DataLoader(dataset=test_data, batch_size=cfg['batch_size'], shuffle=False, num_workers=6, pin_memory=True)
     # start training
